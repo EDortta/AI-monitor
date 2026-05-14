@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="AI-monitor — a tiny tray app that shows which AI coding agents are running on your computer." />
+<title>AI-monitor — See your agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* base — cool, technical, no warmth */
+    --bg:        #fafaf7;
+    --bg-card:   #ffffff;
+    --bg-soft:   #eeece5;
+    --ink:       #08152c;        /* deep brazil navy, almost black */
+    --ink-soft:  #34405a;
+    --ink-mute:  #7c8699;
+    --rule:      #dcdad0;
+    --rule-soft: #ebe9df;
+
+    /* brand accents — one at a time, never together */
+    --amarelo:   #f0b400;        /* electric ouro */
+    --verde:     #007a3a;        /* verde-bandeira darkened */
+    --azul:      #08152c;        /* doubles as ink */
+
+    /* agent colors — kept exactly as the README defines */
+    --claude:    #e07a3c;
+    --codex:     #3fa66b;
+    --cursor:    #3f7ac9;
+    --idle:      #9a978d;
+
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 0; }
+
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 32px; }
+
+  /* ─── NAV ─── */
+  nav.top {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in oklch, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0;
+    gap: 24px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--display);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  .brand-mark {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--ink);
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .brand-mark::before, .brand-mark::after {
+    content: ""; position: absolute; border-radius: 50%;
+  }
+  .brand-mark::before {
+    width: 8px; height: 8px;
+    background: var(--amarelo);
+    top: 6px; left: 9px;
+  }
+  .brand-mark::after {
+    width: 6px; height: 6px;
+    background: var(--cursor);
+    bottom: 6px; left: 7px;
+    box-shadow: 8px 0 0 var(--codex);
+  }
+  .nav-links {
+    display: flex; align-items: center; gap: 26px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .nav-links a:hover { color: var(--ink); }
+  .lang {
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--rule);
+    border-radius: 99px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .lang button {
+    padding: 5px 10px;
+    color: var(--ink-mute);
+    transition: background .15s, color .15s;
+  }
+  .lang button.on { background: var(--ink); color: var(--bg); }
+  .lang button:hover:not(.on) { color: var(--ink); }
+  .gh-cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px;
+    padding: 8px 14px;
+    border: 1px solid var(--ink);
+    border-radius: 99px;
+    transition: background .15s, color .15s;
+  }
+  .gh-cta:hover { background: var(--ink); color: var(--bg); }
+
+  /* ─── HERO ─── */
+  header.hero {
+    padding: 88px 0 120px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--ink-mute);
+    margin-bottom: 28px;
+  }
+  .hero-eyebrow .pill {
+    padding: 4px 9px;
+    border: 1px solid var(--rule);
+    border-radius: 99px;
+    background: var(--bg-card);
+    color: var(--ink);
+  }
+  .hero h1 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(44px, 7vw, 86px);
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    margin: 0;
+    max-width: 14ch;
+  }
+  .hero h1 em {
+    font-style: normal;
+    font-weight: 500;
+    background-image: linear-gradient(transparent 62%, color-mix(in oklch, var(--amarelo) 55%, transparent) 62%, color-mix(in oklch, var(--amarelo) 55%, transparent) 92%, transparent 92%);
+    background-repeat: no-repeat;
+    padding: 0 .04em;
+  }
+  .hero h1 .dot-inline {
+    display: inline-block;
+    width: .54em; height: .54em;
+    border-radius: 50%;
+    background: var(--amarelo);
+    margin: 0 .04em -.04em .02em;
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--amarelo) 70%, transparent);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0   color-mix(in oklch, var(--amarelo) 70%, transparent); }
+    70%  { box-shadow: 0 0 0 18px color-mix(in oklch, var(--amarelo) 0%,  transparent); }
+    100% { box-shadow: 0 0 0 0   color-mix(in oklch, var(--amarelo) 0%,  transparent); }
+  }
+  .hero-lede {
+    max-width: 54ch;
+    margin: 32px 0 0;
+    font-size: 18.5px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+  .hero-cta {
+    margin-top: 40px;
+    display: flex; flex-wrap: wrap; gap: 12px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px;
+    border-radius: 99px;
+    font-size: 14.5px;
+    font-weight: 500;
+    transition: transform .12s, background .15s, color .15s, border-color .15s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .btn-primary:hover { background: #000; }
+  .btn-ghost {
+    border: 1px solid var(--rule);
+    background: var(--bg-card);
+  }
+  .btn-ghost:hover { border-color: var(--ink); }
+
+  /* hero grid — tray viz + arara peeks beside it */
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap: 56px;
+    align-items: center;
+  }
+
+  /* ── tray viz ── */
+  .tray-viz {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    max-width: 440px;
+    margin-left: auto;
+    display: grid;
+    place-items: center;
+  }
+  .tray-shell {
+    position: absolute; inset: 0;
+    border-radius: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    box-shadow:
+      0 1px 0 #fff inset,
+      0 30px 60px -30px rgba(11,26,58,.18);
+  }
+  .tray-shell::before {
+    content: ""; position: absolute; inset: 14px;
+    border-radius: 14px;
+    border: 1px dashed var(--rule);
+  }
+  .tray-grid-bg {
+    position: absolute; inset: 14px;
+    border-radius: 14px;
+    background-image:
+      linear-gradient(var(--rule-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+    background-size: 24px 24px;
+    opacity: .4;
+    pointer-events: none;
+    mask-image: radial-gradient(circle at center, #000 40%, transparent 75%);
+  }
+  .tray-state {
+    position: absolute;
+    top: 28px; left: 28px;
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+  }
+  .tray-state .live {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--amarelo);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .25; }
+  }
+  .tray-time {
+    position: absolute; top: 28px; right: 28px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-mute);
+    letter-spacing: .05em;
+  }
+  .tray-icon {
+    position: relative;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: var(--ink);
+    display: grid; place-items: center;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.06) inset,
+      0 30px 50px -20px rgba(11,26,58,.35);
+  }
+  .tray-icon::after {
+    content: ""; position: absolute;
+    top: 8%; left: 12%; right: 12%;
+    height: 35%;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at top, rgba(255,255,255,.14), transparent 70%);
+    pointer-events: none;
+  }
+  .dots {
+    position: relative;
+    width: 96px; height: 96px;
+  }
+  .dot {
+    position: absolute;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    transition: transform .45s cubic-bezier(.65,0,.35,1), opacity .35s;
+    box-shadow:
+      0 0 0 2px rgba(0,0,0,.25),
+      0 6px 16px -4px rgba(0,0,0,.55),
+      inset 0 -3px 6px rgba(0,0,0,.25),
+      inset 0 3px 6px rgba(255,255,255,.25);
+  }
+  .dot.claude { background: var(--claude); }
+  .dot.codex  { background: var(--codex);  }
+  .dot.cursor { background: var(--cursor); }
+  .dot.idle   { background: var(--idle); opacity: .85; }
+
+  /* states */
+  .tray-icon[data-state="1"] .dot.claude { transform: translate(32px, 32px) scale(1.2); }
+  .tray-icon[data-state="1"] .dot.codex,
+  .tray-icon[data-state="1"] .dot.cursor { transform: translate(32px, 32px) scale(0); opacity: 0; }
+  .tray-icon[data-state="2"] .dot.claude { transform: translate(16px, 14px); }
+  .tray-icon[data-state="2"] .dot.cursor { transform: translate(48px, 50px); }
+  .tray-icon[data-state="2"] .dot.codex  { transform: translate(32px, 32px) scale(0); opacity: 0; }
+  .tray-icon[data-state="3"] .dot.claude { transform: translate(8px, 12px); }
+  .tray-icon[data-state="3"] .dot.codex  { transform: translate(56px, 12px); }
+  .tray-icon[data-state="3"] .dot.cursor { transform: translate(32px, 54px); }
+  .tray-icon[data-state="0"] .dot.claude,
+  .tray-icon[data-state="0"] .dot.codex,
+  .tray-icon[data-state="0"] .dot.cursor { transform: translate(32px, 32px) scale(0); opacity: 0; }
+  .dot.idle { transform: translate(32px, 32px) scale(0); opacity: 0; }
+  .tray-icon[data-state="0"] .dot.idle  { transform: translate(32px, 32px) scale(1); opacity: 1; }
+
+  .tray-legend {
+    position: absolute;
+    left: 28px; right: 28px; bottom: 28px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-soft);
+  }
+  .tray-legend > div {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+  }
+  .tray-legend i {
+    width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
+  }
+
+  /* ── arara mascot — always peeks from bottom-right corner of viewport ── */
+  .arara-peek {
+    position: fixed;
+    right: -30px;
+    bottom: -20px;
+    width: 200px;
+    height: 180px;
+    pointer-events: none;
+    z-index: 40;
+    transform-origin: bottom right;
+    animation: lean 7s ease-in-out infinite;
+    filter: drop-shadow(-8px -2px 18px rgba(8, 21, 44, .12));
+  }
+  @keyframes lean {
+    0%, 100% { transform: rotate(0deg) translateY(0); }
+    45%, 55% { transform: rotate(-3deg) translateY(-3px); }
+  }
+  .arara-peek svg { width: 100%; height: 100%; display: block; }
+  .arara-peek .eyelid {
+    transform-origin: 100px 92px;
+    animation: blink 4.5s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 92%, 100% { transform: scaleY(0); }
+    94%, 98%      { transform: scaleY(1); }
+  }
+  .arara-name {
+    position: fixed;
+    right: 24px;
+    bottom: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    z-index: 41;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
+  .arara-peek:hover + .arara-name,
+  body:hover .arara-name {
+    opacity: 1;
+  }
+  .arara-name::before {
+    content: "↳ ";
+    color: var(--amarelo);
+  }
+
+  /* ─── SECTIONS ─── */
+  section { padding: 96px 0; border-top: 1px solid var(--rule-soft); }
+  .section-num {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    padding: 4px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 99px;
+    background: var(--bg-card);
+    margin-bottom: 18px;
+  }
+  .section-num b { color: var(--ink); font-weight: 600; margin-right: 6px; }
+  .section-title {
+    font-family: var(--display);
+    font-size: clamp(34px, 4.5vw, 54px);
+    line-height: 1.06;
+    letter-spacing: -.02em;
+    font-weight: 500;
+    margin: 0;
+    max-width: 22ch;
+  }
+  .section-title em {
+    font-style: normal;
+    background-image: linear-gradient(transparent 62%, color-mix(in oklch, var(--amarelo) 55%, transparent) 62%, color-mix(in oklch, var(--amarelo) 55%, transparent) 92%, transparent 92%);
+    background-repeat: no-repeat;
+    padding: 0 .04em;
+  }
+  .section-lede {
+    max-width: 60ch;
+    margin: 22px 0 0;
+    font-size: 17px;
+    color: var(--ink-soft);
+  }
+
+  /* problem cards */
+  .cards-3 {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 28px 26px;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -22px rgba(11,26,58,.16); }
+  .card-glyph {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--bg-soft);
+    border: 1px solid var(--rule);
+    display: grid; place-items: center;
+    margin-bottom: 22px;
+    color: var(--ink);
+  }
+  .card h3 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 21px;
+    margin: 0 0 10px;
+    letter-spacing: -.01em;
+  }
+  .card p {
+    margin: 0;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+
+  /* how grid */
+  .how-grid {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+  .state-list { display: flex; flex-direction: column; gap: 12px; }
+  .state-row {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 18px;
+    align-items: center;
+    padding: 20px 22px;
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+  }
+  .state-dot {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: var(--ink);
+    display: grid; place-items: center;
+    position: relative;
+  }
+  .state-dot i {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+  .state-dot.idle i { background: var(--idle); }
+  .state-dot.claude i { background: var(--claude); }
+  .state-dot.codex i { background: var(--codex); }
+  .state-dot.cursor i { background: var(--cursor); }
+  .state-dot.multi i {
+    position: absolute;
+    width: 9px; height: 9px;
+  }
+  .state-dot.multi i:nth-child(1) { background: var(--claude); top: 14px; left: 14px; }
+  .state-dot.multi i:nth-child(2) { background: var(--codex);  top: 14px; right: 14px; }
+  .state-dot.multi i:nth-child(3) { background: var(--cursor); bottom: 12px; left: 19px; }
+  .state-row b { font-family: var(--display); font-weight: 500; font-size: 17px; display: block; margin-bottom: 3px; letter-spacing: -.005em; }
+  .state-row span { font-size: 13.5px; color: var(--ink-soft); }
+  .state-row code {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    background: var(--bg-soft);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  /* files card */
+  .files-card {
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .files-card h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--ink-mute);
+    margin: 0 0 22px;
+    font-weight: 500;
+  }
+  .file-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+    padding: 16px 0;
+    border-top: 1px dashed var(--rule);
+  }
+  .file-row:first-of-type { border-top: 0; padding-top: 0; }
+  .file-icon {
+    width: 42px; height: 50px;
+    border-radius: 4px 8px 4px 4px;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .file-icon::before {
+    content: ""; position: absolute; top: 0; right: 0;
+    width: 13px; height: 13px;
+    background: var(--bg-soft);
+    border-left: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    border-bottom-left-radius: 4px;
+  }
+  .file-icon::after {
+    content: attr(data-ext);
+    position: absolute; bottom: 6px; left: 0; right: 0;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 8.5px;
+    color: var(--ink-mute);
+    letter-spacing: .04em;
+  }
+  .file-row .label {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink);
+    word-break: break-all;
+  }
+  .file-row .label small {
+    display: block;
+    font-family: var(--sans);
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+    line-height: 1.5;
+    word-break: normal;
+  }
+  .file-row .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    padding: 3px 8px;
+    border-radius: 99px;
+    margin-top: 6px;
+  }
+  .tag.live { background: color-mix(in oklch, var(--amarelo) 24%, var(--bg-card)); color: #7a5e0a; }
+  .tag.append { background: color-mix(in oklch, var(--verde) 18%, var(--bg-card)); color: var(--verde); }
+
+  /* UI mocks */
+  .ui-grid {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .ui-card {
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: 24px;
+    position: relative;
+  }
+  .ui-card-label {
+    position: absolute; top: -10px; left: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    background: var(--ink);
+    color: var(--bg);
+    border-radius: 99px;
+  }
+  .ui-card h4 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 18px;
+    margin: 8px 0 6px;
+  }
+  .ui-card > p {
+    margin: 0 0 18px;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+  }
+  .popup, .history {
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .popup-head, .history-head {
+    padding: 10px 14px;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--rule);
+    display: flex; justify-content: space-between;
+    color: var(--ink-mute);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+  }
+  .history-head { gap: 10px; justify-content: flex-start; }
+  .history-head .tab {
+    padding: 3px 9px;
+    border-radius: 99px;
+    border: 1px solid transparent;
+  }
+  .history-head .tab.on {
+    background: var(--bg);
+    border-color: var(--rule);
+    color: var(--ink);
+  }
+  .popup-row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 11px 14px;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .popup-row:first-of-type { border-top: 0; }
+  .popup-row i {
+    width: 10px; height: 10px; border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+  .popup-row .agent { color: var(--ink); font-weight: 500; }
+  .popup-row .proj { color: var(--ink-soft); font-size: 11px; display: block; margin-top: 2px; word-break: break-all; }
+  .popup-row .dur { color: var(--ink-mute); font-size: 11px; }
+  .history-row {
+    display: grid;
+    grid-template-columns: 88px 14px 1fr auto;
+    gap: 12px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--rule-soft);
+    align-items: center;
+  }
+  .history-row .time { color: var(--ink-mute); font-size: 11px; }
+  .history-row i { width: 9px; height: 9px; border-radius: 50%; justify-self: center; }
+  .history-row .what { color: var(--ink); }
+  .history-row .what small { color: var(--ink-mute); display: block; font-size: 10.5px; margin-top: 2px; }
+  .history-row .meta { color: var(--ink-mute); font-size: 10.5px; }
+
+  /* terminal */
+  .install-grid {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 40px;
+    align-items: start;
+  }
+  .platforms { display: flex; flex-direction: column; gap: 10px; }
+  .platform {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .platform:hover { border-color: var(--ink-mute); }
+  .platform.active {
+    border-color: var(--ink);
+    box-shadow: inset 3px 0 0 0 var(--amarelo);
+  }
+  .platform-glyph {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+  .platform b { font-family: var(--display); font-weight: 500; font-size: 16px; display: block; }
+  .platform span { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); }
+
+  .terminal {
+    background: #08122a;
+    color: #e8eaf1;
+    border-radius: 14px;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.75;
+    box-shadow: 0 30px 60px -30px rgba(11,26,58,.4);
+  }
+  .terminal-bar {
+    background: #050d20;
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #11203f;
+  }
+  .terminal-bar i { width: 11px; height: 11px; border-radius: 50%; }
+  .terminal-bar i:nth-child(1) { background: #ff5f57; }
+  .terminal-bar i:nth-child(2) { background: var(--amarelo); }
+  .terminal-bar i:nth-child(3) { background: var(--verde); }
+  .terminal-bar .path { margin-left: auto; color: #6d7993; font-size: 11px; }
+  .terminal-body { padding: 22px 24px; }
+  .terminal-body .prompt { color: #6d7993; user-select: none; }
+  .terminal-body .cmd { color: #fff; }
+  .terminal-body .comment { color: #6d7993; }
+  .terminal-body .ok { color: var(--amarelo); }
+  .terminal-body .info { color: #8ab4f8; }
+  .terminal-body .dim { color: #8b94a8; }
+
+  /* quote — pure typographic moment */
+  .quote-section {
+    text-align: center;
+    padding: 80px 0;
+  }
+  .quote-section blockquote {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: clamp(26px, 3.2vw, 40px);
+    line-height: 1.28;
+    max-width: 24ch;
+    margin: 0 auto;
+    color: var(--ink);
+    font-weight: 400;
+    letter-spacing: -.018em;
+  }
+  .quote-section blockquote::before { content: "“"; color: var(--amarelo); margin-right: .04em; }
+  .quote-section blockquote::after { content: "”"; color: var(--cursor); margin-left: .04em; }
+
+  /* companions */
+  .companion-grid {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .companion {
+    background: var(--bg-card);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: 28px 28px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .companion:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -22px rgba(11,26,58,.16); }
+  .companion-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--ink-mute);
+  }
+  .companion h3 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 24px;
+    margin: 10px 0 12px;
+    letter-spacing: -.015em;
+  }
+  .companion p {
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: 0 0 22px;
+  }
+  .companion .link {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 2px;
+  }
+
+  /* footer */
+  footer {
+    border-top: 1px solid var(--rule-soft);
+    padding: 56px 0 44px;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+  }
+  .foot-inner {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 24px; flex-wrap: wrap;
+  }
+  .foot-brand { display: flex; align-items: center; gap: 10px; }
+  .foot-arara { width: 32px; height: 32px; }
+  .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
+  .foot-links a:hover { color: var(--ink); }
+
+  /* lang */
+  [data-i18n] { display: none; }
+  body[data-lang="en"]    [data-i18n="en"],
+  body[data-lang="pt-br"] [data-i18n="pt-br"],
+  body[data-lang="es"]    [data-i18n="es"] {
+    display: revert;
+  }
+
+  /* responsive */
+  @media (max-width: 960px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    .tray-viz { max-width: 360px; margin: 0 auto; }
+    .arara-peek { right: -22px; bottom: -14px; width: 130px; height: 118px; }
+    .arara-name { display: none; }
+    .cards-3 { grid-template-columns: 1fr; }
+    .how-grid { grid-template-columns: 1fr; gap: 32px; }
+    .install-grid { grid-template-columns: 1fr; }
+    .ui-grid { grid-template-columns: 1fr; }
+    .companion-grid { grid-template-columns: 1fr; }
+    .nav-links a:not(.gh-cta) { display: none; }
+    section { padding: 72px 0; }
+    header.hero { padding: 56px 0 80px; }
+  }
+</style>
+</head>
+<body data-lang="en">
+
+<nav class="top">
+  <div class="wrap nav-inner">
+    <a href="#" class="brand" aria-label="AI-monitor">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>AI-monitor</span>
+    </a>
+    <div class="nav-links">
+      <a href="#problem">
+        <span data-i18n="en">Why</span>
+        <span data-i18n="pt-br">Por quê</span>
+        <span data-i18n="es">Por qué</span>
+      </a>
+      <a href="#how">
+        <span data-i18n="en">How it works</span>
+        <span data-i18n="pt-br">Como funciona</span>
+        <span data-i18n="es">Cómo funciona</span>
+      </a>
+      <a href="#install">
+        <span data-i18n="en">Install</span>
+        <span data-i18n="pt-br">Instalar</span>
+        <span data-i18n="es">Instalar</span>
+      </a>
+      <a href="#family">
+        <span data-i18n="en">Family</span>
+        <span data-i18n="pt-br">Família</span>
+        <span data-i18n="es">Familia</span>
+      </a>
+      <div class="lang" role="tablist" aria-label="Language">
+        <button data-lang-btn="en"    class="on">EN</button>
+        <button data-lang-btn="pt-br">PT</button>
+        <button data-lang-btn="es">ES</button>
+      </div>
+      <a class="gh-cta" href="https://github.com/EDortta/AI-monitor" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2 .37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div style="position: relative;">
+      <div class="hero-eyebrow">
+        <span class="pill">v0.1 · tray app</span>
+        <span data-i18n="en">Linux · macOS · Windows</span>
+        <span data-i18n="pt-br">Linux · macOS · Windows</span>
+        <span data-i18n="es">Linux · macOS · Windows</span>
+      </div>
+      <h1>
+        <span data-i18n="en">See <em>which agents</em> are running<span class="dot-inline" aria-hidden="true"></span></span>
+        <span data-i18n="pt-br">Veja <em>quais agentes</em> estão rodando<span class="dot-inline" aria-hidden="true"></span></span>
+        <span data-i18n="es">Mira <em>qué agentes</em> están corriendo<span class="dot-inline" aria-hidden="true"></span></span>
+      </h1>
+      <p class="hero-lede">
+        <span data-i18n="en">A small tray app that shows which AI coding agents — Claude Code, Codex, Cursor — are active on your machine, with a browsable history of every past session.</span>
+        <span data-i18n="pt-br">Um pequeno aplicativo de bandeja que mostra quais agentes de IA — Claude Code, Codex, Cursor — estão ativos na sua máquina, com histórico navegável de cada sessão anterior.</span>
+        <span data-i18n="es">Una pequeña app de bandeja que muestra qué agentes de IA — Claude Code, Codex, Cursor — están activos en tu máquina, con un historial navegable de cada sesión anterior.</span>
+      </p>
+      <div class="hero-cta">
+        <a href="#install" class="btn btn-primary">
+          <span data-i18n="en">Install in 60 seconds</span>
+          <span data-i18n="pt-br">Instalar em 60 segundos</span>
+          <span data-i18n="es">Instalar en 60 segundos</span>
+          <span aria-hidden="true">→</span>
+        </a>
+        <a href="https://github.com/EDortta/AI-monitor" target="_blank" rel="noopener" class="btn btn-ghost">
+          <span data-i18n="en">View on GitHub</span>
+          <span data-i18n="pt-br">Ver no GitHub</span>
+          <span data-i18n="es">Ver en GitHub</span>
+        </a>
+      </div>
+
+    </div>
+
+    <div class="tray-viz" aria-hidden="true">
+      <div class="tray-shell">
+        <div class="tray-grid-bg"></div>
+        <div class="tray-state">
+          <span class="live"></span>
+          <span data-state-label>3 agents · live</span>
+        </div>
+        <div class="tray-time">~/Sync · agent-status.json</div>
+        <div class="tray-legend">
+          <div><i style="background:var(--claude)"></i> Claude</div>
+          <div><i style="background:var(--codex)"></i> Codex</div>
+          <div><i style="background:var(--cursor)"></i> Cursor</div>
+        </div>
+      </div>
+      <div class="tray-icon" id="trayIcon" data-state="3">
+        <div class="dots">
+          <span class="dot idle"></span>
+          <span class="dot claude"></span>
+          <span class="dot codex"></span>
+          <span class="dot cursor"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tião · arara mascot — peeks from bottom-right corner of hero -->
+  <div class="arara-peek" aria-hidden="true">
+    <svg viewBox="0 0 220 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- body curve, off-frame right (mostly hidden) -->
+      <path d="M120 130 Q200 110 220 200 L120 200 Z" fill="#08152c"/>
+      <!-- yellow chest peeking through -->
+      <path d="M100 145 Q135 142 168 200 L100 200 Z" fill="#f0b400"/>
+      <!-- wing draped over chest -->
+      <path d="M118 128 Q172 142 200 200 L156 200 Q138 168 112 142 Z" fill="#08152c"/>
+      <!-- subtle wing feather line -->
+      <path d="M140 152 Q165 175 178 198" stroke="#1a2540" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+      <!-- crest tuft (signature head feathers) -->
+      <path d="M118 30 Q124 14 138 22" stroke="#08152c" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <path d="M134 26 Q142 12 154 20" stroke="#08152c" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <path d="M126 32 Q130 18 142 24" stroke="#08152c" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+      <!-- head -->
+      <circle cx="120" cy="88" r="58" fill="#08152c"/>
+
+      <!-- nape feathers texture -->
+      <path d="M148 92 Q162 86 174 94" stroke="#1a2540" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M152 106 Q166 100 178 108" stroke="#1a2540" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+      <!-- face patch (bare skin around eye) -->
+      <ellipse cx="92" cy="92" rx="36" ry="28" fill="#fafaf3"/>
+
+      <!-- canindé's signature striations on bare skin -->
+      <path d="M60 85 Q85 83 108 87" stroke="#dcd5bd" stroke-width="1" fill="none"/>
+      <path d="M58 96 Q85 94 108 98" stroke="#dcd5bd" stroke-width="1" fill="none"/>
+      <path d="M60 107 Q85 105 108 109" stroke="#dcd5bd" stroke-width="1" fill="none"/>
+
+      <!-- eye socket dark, then eye, highlight -->
+      <circle cx="86" cy="92" r="8" fill="#08152c"/>
+      <circle cx="86" cy="92" r="6" fill="#1a1410"/>
+      <circle cx="88.5" cy="89.5" r="2.4" fill="#fff"/>
+      <!-- eyelid (animates blink) -->
+      <ellipse class="eyelid" cx="86" cy="92" rx="9" ry="8.5" fill="#08152c"/>
+
+      <!-- BEAK — large, hooked, the arara signature -->
+      <!-- upper mandible -->
+      <path d="M58 86
+               Q18 86 14 124
+               Q22 138 50 134
+               Q82 126 92 102
+               Q88 84 64 80 Z" fill="#1a1612"/>
+      <!-- beak crease/line -->
+      <path d="M30 112 Q58 110 84 102" stroke="#3a322a" stroke-width="1.4" fill="none"/>
+      <!-- highlight along upper edge -->
+      <path d="M40 90 Q62 88 84 90" stroke="#3a322a" stroke-width=".8" fill="none"/>
+      <!-- nostril -->
+      <circle cx="52" cy="96" r="2" fill="#08152c"/>
+      <!-- lower mandible -->
+      <path d="M42 124 Q34 138 56 142 Q80 140 88 126 Q70 130 42 124 Z" fill="#2a2218"/>
+      <!-- mandible separation line -->
+      <path d="M42 124 Q60 126 88 126" stroke="#08152c" stroke-width="1" fill="none"/>
+    </svg>
+  </div>
+  <span class="arara-name" aria-hidden="true">
+    <span data-i18n="en">Tião · the office macaw</span>
+    <span data-i18n="pt-br">Tião · a arara da casa</span>
+    <span data-i18n="es">Tião · la guacamaya de la casa</span>
+  </span>
+</header>
+
+<!-- 01 PROBLEM -->
+<section id="problem">
+  <div class="wrap">
+    <span class="section-num"><b>01</b>
+      <span data-i18n="en">The problem</span>
+      <span data-i18n="pt-br">O problema</span>
+      <span data-i18n="es">El problema</span>
+    </span>
+    <h2 class="section-title">
+      <span data-i18n="en">Your machine runs <em>multiple agents</em>. You see none of them.</span>
+      <span data-i18n="pt-br">Sua máquina roda <em>vários agentes</em>. Você não vê nenhum.</span>
+      <span data-i18n="es">Tu máquina ejecuta <em>varios agentes</em>. No ves ninguno.</span>
+    </h2>
+    <p class="section-lede">
+      <span data-i18n="en">Claude Code in one terminal, Codex in another, Cursor in your IDE — all editing your files at once. There's no operating-system signal telling you who's working where, or what they did when you stepped away.</span>
+      <span data-i18n="pt-br">Claude Code em um terminal, Codex em outro, Cursor no seu IDE — todos editando seus arquivos ao mesmo tempo. Não existe sinal do sistema operacional dizendo quem está trabalhando onde, ou o que fizeram quando você saiu.</span>
+      <span data-i18n="es">Claude Code en una terminal, Codex en otra, Cursor en tu IDE — todos editando tus archivos a la vez. No hay señal del sistema operativo que te diga quién trabaja dónde, o qué hicieron cuando te alejaste.</span>
+    </p>
+
+    <div class="cards-3">
+      <div class="card">
+        <div class="card-glyph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h6m6 0h6M12 3v6m0 6v6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+        </div>
+        <h3>
+          <span data-i18n="en">Invisible parallel work</span>
+          <span data-i18n="pt-br">Trabalho paralelo invisível</span>
+          <span data-i18n="es">Trabajo paralelo invisible</span>
+        </h3>
+        <p>
+          <span data-i18n="en">Two agents can write to the same repo simultaneously and you have no way to know — until the merge conflict explodes.</span>
+          <span data-i18n="pt-br">Dois agentes podem escrever no mesmo repo simultaneamente sem que você saiba — até que o conflito de merge exploda.</span>
+          <span data-i18n="es">Dos agentes pueden escribir en el mismo repo al mismo tiempo sin que lo sepas — hasta que el conflicto de merge explota.</span>
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-glyph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <h3>
+          <span data-i18n="en">No session memory</span>
+          <span data-i18n="pt-br">Sem memória de sessão</span>
+          <span data-i18n="es">Sin memoria de sesión</span>
+        </h3>
+        <p>
+          <span data-i18n="en">"What was that agent working on last Tuesday?" The chat is gone. The branch maybe still exists. The trail of decisions doesn't.</span>
+          <span data-i18n="pt-br">"No que aquele agente estava trabalhando terça?" O chat sumiu. O branch talvez exista. O rastro de decisões, não.</span>
+          <span data-i18n="es">"¿En qué trabajaba ese agente el martes?" El chat ya no está. La rama quizá sí. El rastro de decisiones, no.</span>
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-glyph">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+        </div>
+        <h3>
+          <span data-i18n="en">Tools don't talk</span>
+          <span data-i18n="pt-br">Ferramentas não conversam</span>
+          <span data-i18n="es">Las herramientas no hablan</span>
+        </h3>
+        <p>
+          <span data-i18n="en">Claude doesn't know Cursor is open. Codex doesn't know Claude just committed. Each agent runs in its own bubble.</span>
+          <span data-i18n="pt-br">Claude não sabe que o Cursor está aberto. Codex não sabe que o Claude acabou de commitar. Cada agente roda numa bolha.</span>
+          <span data-i18n="es">Claude no sabe que Cursor está abierto. Codex no sabe que Claude acaba de commitear. Cada agente vive en su burbuja.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <span class="section-num"><b>02</b>
+      <span data-i18n="en">How it works</span>
+      <span data-i18n="pt-br">Como funciona</span>
+      <span data-i18n="es">Cómo funciona</span>
+    </span>
+    <h2 class="section-title">
+      <span data-i18n="en">Two files. <em>One glance.</em></span>
+      <span data-i18n="pt-br">Dois arquivos. <em>Um olhar.</em></span>
+      <span data-i18n="es">Dos archivos. <em>Una mirada.</em></span>
+    </h2>
+    <p class="section-lede">
+      <span data-i18n="en">Each agent appends to a shared status file when it starts and removes itself when it ends. The tray icon reads that file four times per second and colors itself accordingly. That's the entire architecture.</span>
+      <span data-i18n="pt-br">Cada agente acrescenta uma entrada em um arquivo de status compartilhado ao iniciar e se remove ao terminar. O ícone na bandeja lê esse arquivo quatro vezes por segundo e se colore conforme. Essa é a arquitetura inteira.</span>
+      <span data-i18n="es">Cada agente añade una entrada a un archivo de estado compartido al iniciar y se elimina al terminar. El ícono en la bandeja lee ese archivo cuatro veces por segundo y se colorea según corresponda. Esa es toda la arquitectura.</span>
+    </p>
+
+    <div class="how-grid">
+      <div class="state-list">
+        <div class="state-row">
+          <div class="state-dot idle"><i></i></div>
+          <div>
+            <b>
+              <span data-i18n="en">No active session</span>
+              <span data-i18n="pt-br">Sem sessão ativa</span>
+              <span data-i18n="es">Sin sesión activa</span>
+            </b>
+            <span data-i18n="en">Quiet. Nothing is writing to your code right now.</span>
+            <span data-i18n="pt-br">Silêncio. Nada está escrevendo no seu código agora.</span>
+            <span data-i18n="es">Silencio. Nada está escribiendo en tu código ahora.</span>
+          </div>
+          <code>gray</code>
+        </div>
+        <div class="state-row">
+          <div class="state-dot claude"><i></i></div>
+          <div>
+            <b>Claude Code</b>
+            <span data-i18n="en">An agent is editing files in one of your repos.</span>
+            <span data-i18n="pt-br">Um agente está editando arquivos em um dos seus repos.</span>
+            <span data-i18n="es">Un agente está editando archivos en uno de tus repos.</span>
+          </div>
+          <code>#e07a3c</code>
+        </div>
+        <div class="state-row">
+          <div class="state-dot codex"><i></i></div>
+          <div>
+            <b>Codex</b>
+            <span data-i18n="en">OpenAI's CLI agent is running a task.</span>
+            <span data-i18n="pt-br">O agente CLI da OpenAI está rodando uma tarefa.</span>
+            <span data-i18n="es">El agente CLI de OpenAI está ejecutando una tarea.</span>
+          </div>
+          <code>#3fa66b</code>
+        </div>
+        <div class="state-row">
+          <div class="state-dot cursor"><i></i></div>
+          <div>
+            <b>Cursor</b>
+            <span data-i18n="en">Your IDE assistant has the lock.</span>
+            <span data-i18n="pt-br">O assistente do seu IDE tem o controle.</span>
+            <span data-i18n="es">El asistente de tu IDE tiene el control.</span>
+          </div>
+          <code>#3f7ac9</code>
+        </div>
+        <div class="state-row">
+          <div class="state-dot multi"><i></i><i></i><i></i></div>
+          <div>
+            <b>
+              <span data-i18n="en">Multiple agents</span>
+              <span data-i18n="pt-br">Múltiplos agentes</span>
+              <span data-i18n="es">Múltiples agentes</span>
+            </b>
+            <span data-i18n="en">All concurrent sessions appear as separate dots — at a glance.</span>
+            <span data-i18n="pt-br">Todas as sessões simultâneas aparecem como pontos separados — num olhar.</span>
+            <span data-i18n="es">Todas las sesiones simultáneas aparecen como puntos separados — de un vistazo.</span>
+          </div>
+          <code>blended</code>
+        </div>
+      </div>
+
+      <div class="files-card">
+        <h4>~/Sync/ · the entire data layer</h4>
+        <div class="file-row">
+          <div class="file-icon" data-ext="JSON"></div>
+          <div>
+            <div class="label">
+              agent-status.json
+              <small>
+                <span data-i18n="en">Live sessions. Each agent writes its own entry on start and removes it on exit. Polled by the tray.</span>
+                <span data-i18n="pt-br">Sessões ativas. Cada agente escreve sua entrada ao iniciar e a remove ao sair. Lido pela bandeja.</span>
+                <span data-i18n="es">Sesiones activas. Cada agente escribe su entrada al iniciar y la elimina al salir. Leído por la bandeja.</span>
+              </small>
+            </div>
+            <span class="tag live">
+              <span data-i18n="en">live · ephemeral</span>
+              <span data-i18n="pt-br">ao vivo · efêmero</span>
+              <span data-i18n="es">en vivo · efímero</span>
+            </span>
+          </div>
+        </div>
+        <div class="file-row">
+          <div class="file-icon" data-ext="MD"></div>
+          <div>
+            <div class="label">
+              agent-log.md
+              <small>
+                <span data-i18n="en">Append-only session history. Every started + ended session, in markdown, searchable forever.</span>
+                <span data-i18n="pt-br">Histórico de sessões somente acréscimo. Toda sessão iniciada + encerrada, em markdown, pesquisável para sempre.</span>
+                <span data-i18n="es">Historial de sesiones solo añadir. Cada sesión iniciada + finalizada, en markdown, buscable para siempre.</span>
+              </small>
+            </div>
+            <span class="tag append">
+              <span data-i18n="en">append-only · forever</span>
+              <span data-i18n="pt-br">somente acréscimo · permanente</span>
+              <span data-i18n="es">solo añadir · permanente</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 UI -->
+<section id="ui">
+  <div class="wrap">
+    <span class="section-num"><b>03</b>
+      <span data-i18n="en">The interface</span>
+      <span data-i18n="pt-br">A interface</span>
+      <span data-i18n="es">La interfaz</span>
+    </span>
+    <h2 class="section-title">
+      <span data-i18n="en">Click <em>once</em> for now. <em>Twice</em> for then.</span>
+      <span data-i18n="pt-br">Um clique para <em>agora</em>. Dois para <em>antes</em>.</span>
+      <span data-i18n="es">Un clic para <em>ahora</em>. Dos para <em>antes</em>.</span>
+    </h2>
+    <p class="section-lede">
+      <span data-i18n="en">No daemon. No dashboard. No login. The tray icon is the entire app — and it stays out of the way until you ask.</span>
+      <span data-i18n="pt-br">Sem daemon. Sem dashboard. Sem login. O ícone na bandeja é o app inteiro — e fica fora do caminho até você pedir.</span>
+      <span data-i18n="es">Sin daemon. Sin dashboard. Sin login. El ícono en la bandeja es la app entera — y se mantiene fuera del camino hasta que lo pidas.</span>
+    </p>
+
+    <div class="ui-grid">
+      <div class="ui-card">
+        <span class="ui-card-label">Single-click</span>
+        <h4>
+          <span data-i18n="en">Live sessions popup</span>
+          <span data-i18n="pt-br">Popup de sessões ao vivo</span>
+          <span data-i18n="es">Popup de sesiones en vivo</span>
+        </h4>
+        <p>
+          <span data-i18n="en">A compact list of who's running, in which repo, for how long.</span>
+          <span data-i18n="pt-br">Lista compacta de quem está rodando, em qual repo, há quanto tempo.</span>
+          <span data-i18n="es">Lista compacta de quién está corriendo, en qué repo, hace cuánto tiempo.</span>
+        </p>
+        <div class="popup">
+          <div class="popup-head">
+            <span>active · 3</span>
+            <span>15:42:08</span>
+          </div>
+          <div class="popup-row">
+            <i style="background: var(--claude)"></i>
+            <div>
+              <span class="agent">Claude Code</span>
+              <span class="proj">~/Sync/Projects/payments-api</span>
+            </div>
+            <span class="dur">12m 04s</span>
+          </div>
+          <div class="popup-row">
+            <i style="background: var(--codex)"></i>
+            <div>
+              <span class="agent">Codex</span>
+              <span class="proj">~/Sync/Y2/landing-page</span>
+            </div>
+            <span class="dur">03m 27s</span>
+          </div>
+          <div class="popup-row">
+            <i style="background: var(--cursor)"></i>
+            <div>
+              <span class="agent">Cursor</span>
+              <span class="proj">~/Sync/Projects/dashboard</span>
+            </div>
+            <span class="dur">47m 11s</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ui-card">
+        <span class="ui-card-label">Double-click</span>
+        <h4>
+          <span data-i18n="en">Session history</span>
+          <span data-i18n="pt-br">Histórico de sessões</span>
+          <span data-i18n="es">Historial de sesiones</span>
+        </h4>
+        <p>
+          <span data-i18n="en">Browse every past session — when, who, where, for how long.</span>
+          <span data-i18n="pt-br">Navegue por cada sessão passada — quando, quem, onde, por quanto tempo.</span>
+          <span data-i18n="es">Navega cada sesión pasada — cuándo, quién, dónde, cuánto tiempo.</span>
+        </p>
+        <div class="history">
+          <div class="history-head">
+            <span class="tab on">today</span>
+            <span class="tab">7d</span>
+            <span class="tab">all</span>
+          </div>
+          <div class="history-row">
+            <span class="time">14:08 → 14:51</span>
+            <i style="background: var(--claude)"></i>
+            <div class="what">payments-api <small>refactor checkout webhook</small></div>
+            <span class="meta">43m</span>
+          </div>
+          <div class="history-row">
+            <span class="time">12:30 → 13:02</span>
+            <i style="background: var(--cursor)"></i>
+            <div class="what">dashboard <small>style tweaks · charts</small></div>
+            <span class="meta">32m</span>
+          </div>
+          <div class="history-row">
+            <span class="time">10:14 → 10:46</span>
+            <i style="background: var(--codex)"></i>
+            <div class="what">landing-page <small>copy pass · PT-BR translation</small></div>
+            <span class="meta">32m</span>
+          </div>
+          <div class="history-row">
+            <span class="time">09:02 → 09:55</span>
+            <i style="background: var(--claude)"></i>
+            <div class="what">AI-monitor <small>tray rendering on Wayland</small></div>
+            <span class="meta">53m</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 INSTALL -->
+<section id="install">
+  <div class="wrap">
+    <span class="section-num"><b>04</b>
+      <span data-i18n="en">Quick start</span>
+      <span data-i18n="pt-br">Início rápido</span>
+      <span data-i18n="es">Inicio rápido</span>
+    </span>
+    <h2 class="section-title">
+      <span data-i18n="en">One script. <em>Three platforms.</em></span>
+      <span data-i18n="pt-br">Um script. <em>Três plataformas.</em></span>
+      <span data-i18n="es">Un script. <em>Tres plataformas.</em></span>
+    </h2>
+    <p class="section-lede">
+      <span data-i18n="en">The installer creates a virtualenv, installs dependencies, and registers autostart — <code style="font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 6px;border-radius:4px">.desktop</code> on Linux, <code style="font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 6px;border-radius:4px">LaunchAgent</code> on macOS, registry entry on Windows.</span>
+      <span data-i18n="pt-br">O instalador cria um virtualenv, instala as dependências e registra a inicialização automática — <code style="font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 6px;border-radius:4px">.desktop</code> no Linux, <code style="font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 6px;border-radius:4px">LaunchAgent</code> no macOS, entrada de registro no Windows.</span>
+      <span data-i18n="es">El instalador crea un virtualenv, instala las dependencias y registra el inicio automático — <code style="font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 6px;border-radius:4px">.desktop</code> en Linux, <code style="font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 6px;border-radius:4px">LaunchAgent</code> en macOS, entrada de registro en Windows.</span>
+    </p>
+
+    <div class="install-grid">
+      <div class="platforms" role="tablist">
+        <div class="platform active" data-platform="linux"><div class="platform-glyph">🐧</div><div><b>Linux</b><span>./install.sh</span></div></div>
+        <div class="platform" data-platform="macos"><div class="platform-glyph">⌘</div><div><b>macOS</b><span>./install.sh</span></div></div>
+        <div class="platform" data-platform="windows"><div class="platform-glyph">▣</div><div><b>Windows</b><span>install.bat</span></div></div>
+        <div class="platform" data-platform="manual"><div class="platform-glyph">$</div><div><b>
+          <span data-i18n="en">Manual</span>
+          <span data-i18n="pt-br">Manual</span>
+          <span data-i18n="es">Manual</span>
+        </b><span>python3 -m venv .venv</span></div></div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <i></i><i></i><i></i>
+          <span class="path">~/code/AI-monitor</span>
+        </div>
+        <div class="terminal-body">
+          <div data-term="linux">
+<span class="prompt">$ </span><span class="cmd">git clone https://github.com/EDortta/AI-monitor.git</span>
+<span class="prompt">$ </span><span class="cmd">cd AI-monitor &amp;&amp; ./install.sh</span>
+<span class="dim">Creating virtual environment in .venv …</span>
+<span class="dim">Installing requirements …</span>
+<span class="info">→ registered ~/.config/autostart/ai-monitor.desktop</span>
+<span class="ok">✓ tray icon now running</span>
+<span class="comment"># patch AGENTS.md files across your projects</span>
+<span class="prompt">$ </span><span class="cmd">python patch-agents.py</span>
+<span class="ok">✓ patched 14 AGENTS.md files</span>
+          </div>
+          <div data-term="macos" style="display:none">
+<span class="prompt">$ </span><span class="cmd">git clone https://github.com/EDortta/AI-monitor.git</span>
+<span class="prompt">$ </span><span class="cmd">cd AI-monitor &amp;&amp; ./install.sh</span>
+<span class="dim">Detected macOS · using LaunchAgent autostart</span>
+<span class="info">→ ~/Library/LaunchAgents/com.dortta.ai-monitor.plist</span>
+<span class="ok">✓ launchctl loaded · tray icon visible</span>
+          </div>
+          <div data-term="windows" style="display:none">
+<span class="prompt">&gt; </span><span class="cmd">git clone https://github.com/EDortta/AI-monitor.git</span>
+<span class="prompt">&gt; </span><span class="cmd">cd AI-monitor</span>
+<span class="prompt">&gt; </span><span class="cmd">install.bat</span>
+<span class="dim">Creating .venv ...</span>
+<span class="info">→ registered HKCU\...\Run\AIMonitor</span>
+<span class="ok">[OK] tray icon now running</span>
+          </div>
+          <div data-term="manual" style="display:none">
+<span class="prompt">$ </span><span class="cmd">python3 -m venv .venv</span>
+<span class="prompt">$ </span><span class="cmd">source .venv/bin/activate</span>
+<span class="comment"># Windows: .venv\Scripts\activate</span>
+<span class="prompt">$ </span><span class="cmd">pip install -r requirements.txt</span>
+<span class="prompt">$ </span><span class="cmd">python monitor.py</span>
+<span class="ok">✓ tray icon visible</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 QUOTE -->
+<section class="quote-section">
+  <div class="wrap">
+    <blockquote>
+      <span data-i18n="en">What are the agents being done on your computer at all?</span>
+      <span data-i18n="pt-br">O que estão fazendo os agentes no seu computador, afinal?</span>
+      <span data-i18n="es">¿Qué están haciendo los agentes en tu computadora, al fin y al cabo?</span>
+    </blockquote>
+  </div>
+</section>
+
+<!-- 06 FAMILY -->
+<section id="family">
+  <div class="wrap">
+    <span class="section-num"><b>06</b>
+      <span data-i18n="en">Companion projects</span>
+      <span data-i18n="pt-br">Projetos complementares</span>
+      <span data-i18n="es">Proyectos complementarios</span>
+    </span>
+    <h2 class="section-title">
+      <span data-i18n="en">Policy. Runtime. <em>And the watcher.</em></span>
+      <span data-i18n="pt-br">Política. Runtime. <em>E o observador.</em></span>
+      <span data-i18n="es">Política. Runtime. <em>Y el observador.</em></span>
+    </h2>
+    <p class="section-lede">
+      <span data-i18n="en">AI-monitor is the third piece of a small kit for keeping agentic development under control. The other two define the rules and run them; this one watches what actually happens.</span>
+      <span data-i18n="pt-br">AI-monitor é a terceira peça de um pequeno kit para manter o desenvolvimento agêntico sob controle. As outras duas definem as regras e as executam; esta observa o que realmente acontece.</span>
+      <span data-i18n="es">AI-monitor es la tercera pieza de un pequeño kit para mantener bajo control el desarrollo con agentes. Los otros dos definen las reglas y las ejecutan; este observa lo que realmente pasa.</span>
+    </p>
+
+    <div class="companion-grid">
+      <a class="companion" href="https://github.com/EDortta/AI-Agents" target="_blank" rel="noopener">
+        <span class="companion-eyebrow">
+          <span data-i18n="en">Policy pack</span>
+          <span data-i18n="pt-br">Pacote de políticas</span>
+          <span data-i18n="es">Paquete de políticas</span>
+        </span>
+        <h3>AI-Agents</h3>
+        <p>
+          <span data-i18n="en">The "what and why" — AGENTS.md contracts, role definitions, issue templates and workflow docs you copy into any repo to set governance rules.</span>
+          <span data-i18n="pt-br">O "o quê e por quê" — contratos AGENTS.md, definições de papel, templates de issue e docs de fluxo que você copia para qualquer repo para definir regras de governança.</span>
+          <span data-i18n="es">El "qué y por qué" — contratos AGENTS.md, definiciones de rol, plantillas de issue y docs de flujo que copias en cualquier repo para fijar reglas de gobernanza.</span>
+        </p>
+        <span class="link">github.com/EDortta/AI-Agents →</span>
+      </a>
+      <a class="companion" href="https://github.com/EDortta/AI-GovernanceKit" target="_blank" rel="noopener">
+        <span class="companion-eyebrow">
+          <span data-i18n="en">Runtime CLI</span>
+          <span data-i18n="pt-br">CLI de runtime</span>
+          <span data-i18n="es">CLI de runtime</span>
+        </span>
+        <h3>AI-GovernanceKit</h3>
+        <p>
+          <span data-i18n="en">The "how" — a Python package that validates the policy scaffold, runs checks, orchestrates session flows and records audit evidence.</span>
+          <span data-i18n="pt-br">O "como" — um pacote Python que valida o scaffold de políticas, executa verificações, orquestra fluxos de sessão e registra evidências.</span>
+          <span data-i18n="es">El "cómo" — un paquete Python que valida el scaffold de políticas, ejecuta verificaciones, orquesta flujos de sesión y registra evidencias.</span>
+        </p>
+        <span class="link">github.com/EDortta/AI-GovernanceKit →</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div class="foot-brand">
+      <!-- mini arara silhouette -->
+      <svg class="foot-arara" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="18" cy="14" r="9" fill="#0b1a3a"/>
+        <ellipse cx="14" cy="15" rx="4" ry="2.6" fill="#f5f4ee"/>
+        <circle cx="15" cy="14.5" r="1.2" fill="#0b1a3a"/>
+        <path d="M9 16 Q4 17 5 22 Q9 23 12 19 Z" fill="#1a1612"/>
+        <path d="M16 22 Q26 24 28 32 Q22 36 14 32 Q10 26 16 22 Z" fill="#f4c430"/>
+        <path d="M22 22 Q30 25 30 34 L26 34 Q24 28 18 26 Z" fill="#0b1a3a"/>
+      </svg>
+      <span>
+        <strong style="font-family:var(--display);font-weight:600;color:var(--ink)">AI-monitor</strong>
+        <span style="margin: 0 8px; color: var(--ink-mute)">·</span>
+        <span data-i18n="en">See your agents. Keep the trail.</span>
+        <span data-i18n="pt-br">Veja seus agentes. Guarde o rastro.</span>
+        <span data-i18n="es">Mira tus agentes. Guarda el rastro.</span>
+        <span style="margin: 0 8px; color: var(--ink-mute)">·</span>
+        <span>© 2026 Esteban D. Dortta · MIT</span>
+      </span>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/EDortta/AI-monitor" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/EDortta/AI-monitor/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="https://github.com/EDortta/AI-Agents" target="_blank" rel="noopener">AI-Agents</a>
+      <a href="https://github.com/EDortta/AI-GovernanceKit" target="_blank" rel="noopener">GovernanceKit</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // language
+  const langButtons = document.querySelectorAll('[data-lang-btn]');
+  function setLang(lang) {
+    document.body.dataset.lang = lang;
+    langButtons.forEach(b => b.classList.toggle('on', b.dataset.langBtn === lang));
+    const st = trayIcon.dataset.state;
+    if (stateLabel) stateLabel.textContent = labels[st][lang];
+    try { localStorage.setItem('ai-monitor-lang', lang); } catch(e) {}
+  }
+  langButtons.forEach(btn => btn.addEventListener('click', () => setLang(btn.dataset.langBtn)));
+
+  // tray
+  const trayIcon = document.getElementById('trayIcon');
+  const stateLabel = document.querySelector('[data-state-label]');
+  const labels = {
+    '0': { en: '0 agents · idle',  'pt-br': '0 agentes · ocioso',  'es': '0 agentes · inactivo' },
+    '1': { en: '1 agent · live',   'pt-br': '1 agente · ao vivo',  'es': '1 agente · en vivo' },
+    '2': { en: '2 agents · live',  'pt-br': '2 agentes · ao vivo', 'es': '2 agentes · en vivo' },
+    '3': { en: '3 agents · live',  'pt-br': '3 agentes · ao vivo', 'es': '3 agentes · en vivo' }
+  };
+  const cycle = ['3', '1', '2', '0'];
+  let idx = 0;
+  function updateState() {
+    const st = cycle[idx];
+    trayIcon.dataset.state = st;
+    const lang = document.body.dataset.lang || 'en';
+    if (stateLabel) stateLabel.textContent = labels[st][lang];
+    idx = (idx + 1) % cycle.length;
+  }
+  updateState();
+  setInterval(updateState, 2600);
+
+  try {
+    const saved = localStorage.getItem('ai-monitor-lang');
+    if (saved) setLang(saved);
+  } catch(e) {}
+
+  // platforms
+  const platforms = document.querySelectorAll('.platform');
+  const terms = document.querySelectorAll('[data-term]');
+  platforms.forEach(p => {
+    p.addEventListener('click', () => {
+      platforms.forEach(x => x.classList.toggle('active', x === p));
+      const k = p.dataset.platform;
+      terms.forEach(t => t.style.display = t.dataset.term === k ? '' : 'none');
+    });
+  });
+</script>
+</body>
+</html>
