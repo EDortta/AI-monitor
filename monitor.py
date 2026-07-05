@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import logging.handlers
 import os
 import queue
 import re
@@ -36,11 +37,12 @@ from watchdog.events import FileSystemEventHandler
 # Log outside ~/Sync/ so watchdog doesn't see its own writes
 _LOG_PATH = Path.home() / ".local" / "share" / "agent-monitor" / "debug.log"
 _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-logging.basicConfig(
-    filename=_LOG_PATH,
-    level=logging.DEBUG,
-    format="%(asctime)s %(levelname)s %(message)s",
+_LOG_LEVEL = logging.DEBUG if os.environ.get("AGENT_MONITOR_DEBUG") else logging.INFO
+_log_handler = logging.handlers.RotatingFileHandler(
+    _LOG_PATH, maxBytes=1_000_000, backupCount=3,
 )
+_log_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+logging.basicConfig(level=_LOG_LEVEL, handlers=[_log_handler])
 # Silence noisy watchdog internals
 logging.getLogger("watchdog").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
