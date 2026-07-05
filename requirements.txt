@@ -1,4 +1,4 @@
-pystray>=0.19.5
-watchdog>=3.0.0
-Pillow>=9.0.0
-python-xlib>=0.31; sys_platform == "linux"
+pystray==0.19.5
+watchdog==6.0.0
+Pillow==12.2.0
+python-xlib==0.33; sys_platform == "linux"
